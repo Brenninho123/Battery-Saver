@@ -15,17 +15,18 @@
   <style>
     :root {
       --bg: #000000;
-      --card-bg: rgba(14, 14, 18, 0.82);
-      --card-inner: #050507;
+      --card-bg: rgba(12, 12, 16, 0.85);
+      --card-inner: #050508;
       --border: rgba(255, 255, 255, 0.08);
       --border-accent: rgba(52, 199, 89, 0.35);
-      --text: #f2f2f7;
-      --text-dim: #7c7c80;
+      --text: #ffffff;
+      --text-dim: #767680;
       --accent: #34c759;
+      --accent-glow: rgba(52, 199, 89, 0.4);
       --warning: #ffcc00;
       --danger: #ff3b30;
       --ios-blue: #0a84ff;
-      --radius: 20px;
+      --radius: 22px;
     }
 
     * {
@@ -55,12 +56,88 @@
       pointer-events: none;
     }
 
+    #splash-screen {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: #000000;
+      z-index: 999999;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 20px;
+      transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.6s ease;
+    }
+
+    #splash-screen.fade-out {
+      opacity: 0;
+      visibility: hidden;
+    }
+
+    .splash-logo {
+      font-size: 3.5rem;
+      filter: drop-shadow(0 0 15px var(--accent-glow));
+      animation: pulse-logo 1.5s infinite alternate ease-in-out;
+    }
+
+    .splash-title {
+      font-size: 1.4rem;
+      font-weight: 900;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      background: linear-gradient(135deg, #ffffff 0%, #34c759 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .splash-bar-container {
+      width: 200px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .splash-bar-fill {
+      width: 0%;
+      height: 100%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      transition: width 0.2s ease;
+    }
+
+    .splash-subtext {
+      font-size: 0.65rem;
+      color: var(--text-dim);
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      font-family: monospace;
+    }
+
+    @keyframes pulse-logo {
+      0% { transform: scale(0.96); opacity: 0.8; }
+      100% { transform: scale(1.05); opacity: 1; }
+    }
+
     .dashboard {
       width: 100%;
       max-width: 480px;
       display: flex;
       flex-direction: column;
       gap: 16px;
+      opacity: 0;
+      transform: translateY(20px);
+      animation: mount-dashboard 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards 0.3s;
+    }
+
+    @keyframes mount-dashboard {
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
     }
 
     .header {
@@ -72,7 +149,7 @@
     }
 
     .brand h1 {
-      font-size: 1.35rem;
+      font-size: 1.4rem;
       font-weight: 800;
       letter-spacing: -0.6px;
       background: linear-gradient(135deg, #ffffff 0%, #a1a1a6 100%);
@@ -90,7 +167,7 @@
 
     .platform-pill {
       font-size: 0.65rem;
-      padding: 5px 12px;
+      padding: 6px 14px;
       border-radius: 20px;
       background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
@@ -101,6 +178,7 @@
       gap: 8px;
       backdrop-filter: blur(16px);
       -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
 
     .platform-pill .dot {
@@ -123,8 +201,21 @@
       -webkit-backdrop-filter: blur(30px);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 22px;
+      padding: 24px;
       box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at center, rgba(255,255,255,0.02) 0%, transparent 60%);
+      pointer-events: none;
     }
 
     .gauge-wrapper {
@@ -156,7 +247,7 @@
       stroke-dasharray: 440;
       stroke-dashoffset: 440;
       transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.5s ease;
-      filter: drop-shadow(0 0 12px rgba(52, 199, 89, 0.45));
+      filter: drop-shadow(0 0 14px var(--accent-glow));
     }
 
     .gauge-info {
@@ -167,9 +258,9 @@
     }
 
     .gauge-percentage {
-      font-size: 4rem;
-      font-weight: 800;
-      letter-spacing: -2.5px;
+      font-size: 4.2rem;
+      font-weight: 900;
+      letter-spacing: -3px;
       line-height: 1;
     }
 
@@ -200,7 +291,7 @@
     .health-container {
       background: var(--card-inner);
       border: 1px solid var(--border);
-      border-radius: 14px;
+      border-radius: 16px;
       padding: 16px;
       display: flex;
       flex-direction: column;
@@ -228,8 +319,8 @@
 
     .status-badge {
       font-size: 0.7rem;
-      padding: 4px 10px;
-      border-radius: 8px;
+      padding: 4px 12px;
+      border-radius: 20px;
       font-weight: 700;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -273,8 +364,8 @@
     .grid-card {
       background: var(--card-inner);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 12px 14px;
+      border-radius: 14px;
+      padding: 14px;
     }
 
     .grid-label {
@@ -365,6 +456,7 @@
 
     input:checked + .ios-slider {
       background-color: var(--accent);
+      box-shadow: 0 0 12px var(--accent-glow);
     }
 
     input:checked + .ios-slider:before {
@@ -393,28 +485,48 @@
       letter-spacing: 0.5px;
     }
 
+    .btn-action-group {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
     .btn-secondary {
-      background: transparent;
+      background: rgba(255, 255, 255, 0.03);
       border: 1px solid var(--border);
       color: var(--text-dim);
       padding: 14px;
-      border-radius: 12px;
+      border-radius: 14px;
       font-size: 0.75rem;
       text-transform: uppercase;
       letter-spacing: 1px;
       cursor: pointer;
       width: 100%;
       font-weight: 700;
-      transition: all 0.2s ease;
+      transition: all 0.25s ease;
+    }
+
+    .btn-secondary:hover {
+      background: rgba(255, 255, 255, 0.08);
+      color: var(--text);
+      border-color: rgba(255, 255, 255, 0.2);
     }
 
     .btn-secondary:active {
-      background: rgba(255, 255, 255, 0.05);
-      color: var(--text);
+      transform: scale(0.98);
     }
   </style>
 </head>
 <body>
+
+  <div id="splash-screen">
+    <div class="splash-logo">🔋</div>
+    <div class="splash-title">Battery Saver</div>
+    <div class="splash-bar-container">
+      <div class="splash-bar-fill" id="splash-bar"></div>
+    </div>
+    <div class="splash-subtext" id="splash-status">Initializing Core Engine...</div>
+  </div>
 
   <div class="dashboard">
     <div class="header">
@@ -558,14 +670,54 @@
     </div>
 
     <div class="api-status" id="api-status-text">Cloud Sync Standby</div>
-    <button class="btn-secondary" id="btn-reset">Reset Telemetry & Settings</button>
+    
+    <div class="btn-action-group">
+      <button class="btn-secondary" id="btn-replay-intro">Replay Boot Sequence</button>
+      <button class="btn-secondary" id="btn-reset">Reset Telemetry & Settings</button>
+    </div>
   </div>
 
   <script type="module">
     import { BatterySaverApp } from './src/App.js';
 
     document.addEventListener('DOMContentLoaded', () => {
+      const splashScreen = document.getElementById('splash-screen');
+      const splashBar = document.getElementById('splash-bar');
+      const splashStatus = document.getElementById('splash-status');
+
+      const runBootSequence = () => {
+        splashScreen.classList.remove('fade-out');
+        splashBar.style.width = '0%';
+        splashStatus.textContent = 'Initializing Core Engine...';
+
+        setTimeout(() => {
+          splashBar.style.width = '45%';
+          splashStatus.textContent = 'Loading Platform Adapters...';
+        }, 300);
+
+        setTimeout(() => {
+          splashBar.style.width = '85%';
+          splashStatus.textContent = 'Calibrating Governors...';
+        }, 700);
+
+        setTimeout(() => {
+          splashBar.style.width = '100%';
+          splashStatus.textContent = 'Engine Ready.';
+        }, 1100);
+
+        setTimeout(() => {
+          splashScreen.classList.add('fade-out');
+        }, 1400);
+      };
+
+      runBootSequence();
+
       new BatterySaverApp();
+
+      const replayBtn = document.getElementById('btn-replay-intro');
+      if (replayBtn) {
+        replayBtn.addEventListener('click', runBootSequence);
+      }
 
       const pauseEngine = () => {
         document.body.classList.add('engine-paused');
