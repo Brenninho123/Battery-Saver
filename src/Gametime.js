@@ -5,6 +5,7 @@ export class GametimeOverlay {
     this.container = null;
     this.levelElem = null;
     this.iconFillElem = null;
+    this.pipLevelElem = null;
     this.dragOffset = { x: 0, y: 0 };
     this.isDragging = false;
     this.hasMoved = false;
@@ -22,6 +23,7 @@ export class GametimeOverlay {
     this.injectStyles();
     this.loadSavedPosition();
     this.bindEvents();
+    this.requestNotificationPermission();
   }
 
   createDom() {
@@ -36,6 +38,7 @@ export class GametimeOverlay {
           <div class="gametime-battery-level" id="gametime-fill"></div>
         </div>
         <span class="gametime-text" id="gametime-text">--%</span>
+        <button class="gametime-pip-btn" id="gametime-pip-btn" title="Pop out Overlay">⧉</button>
       </div>
     `;
 
@@ -58,7 +61,7 @@ export class GametimeOverlay {
         z-index: 99999;
         display: flex;
         align-items: center;
-        padding: 6px 12px;
+        padding: 6px 10px;
         background: rgba(10, 10, 14, 0.88);
         backdrop-filter: blur(20px);
         -webkit-backdrop-filter: blur(20px);
@@ -80,7 +83,8 @@ export class GametimeOverlay {
         display: none !important;
       }
 
-      .gametime-overlay.collapsed .gametime-text {
+      .gametime-overlay.collapsed .gametime-text,
+      .gametime-overlay.collapsed .gametime-pip-btn {
         display: none;
       }
 
@@ -94,6 +98,21 @@ export class GametimeOverlay {
         align-items: center;
         gap: 8px;
         pointer-events: none;
+      }
+
+      .gametime-pip-btn {
+        pointer-events: auto;
+        background: transparent;
+        border: none;
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.75rem;
+        cursor: pointer;
+        padding: 0 2px;
+        line-height: 1;
+      }
+
+      .gametime-pip-btn:hover {
+        color: #ffffff;
       }
 
       .gametime-battery-icon {
@@ -143,30 +162,96 @@ export class GametimeOverlay {
     document.head.appendChild(style);
   }
 
+  async requestNotificationPermission() {
+    if ('Notification' in window && Notification.permission === 'default') {
+      try {
+        await Notification.requestPermission();
+      } catch (e) {}
+    }
+  }
+
+  updateSystemBadge(level) {
+    if ('setAppBadge' in navigator) {
+      navigator.setAppBadge(level).catch(() => {});
+    } else if ('experimentalSetAppBadge' in navigator) {
+      navigator.experimentalSetAppBadge(level).catch(() => {});
+    }
+  }
+
+  async updateSystemNotification(level, isCharging) {
+    if ('Notification' in window && Notification.permission === 'granted' && 'serviceWorker' in navigator) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const statusText = isCharging ? 'Charging' : 'Discharging';
+        
+        registration.showNotification(`Battery Saver: ${level}%`, {
+          body: `State: ${statusText} | Monitor active`,
+          icon: 'https://img.icons8.com/color/192/000000/full-battery.png',
+          tag: 'battery-status-tracker',
+          renotify: false,
+          silent: true
+        });
+      } catch (e) {}
+    }
+  }
+
+  async openFloatingPiP() {
+    if ('documentPictureInPicture' in window) {
+      try {
+        const pipWindow = await window.documentPictureInPicture.requestWindow({
+          width: 140,
+          height: 48
+        });
+
+        pipWindow.document.body.style.margin = '0';
+        pipWindow.document.body.style.background = '#000000';
+        pipWindow.document.body.style.display = 'flex';
+        pipWindow.document.body.style.alignItems = 'center';
+        pipWindow.document.body.style.justifyContent = 'center';
+
+        pipWindow.document.body.innerHTML = `
+          <div style="color:#ffffff; font-family:-apple-system, sans-serif; font-weight:800; font-size:1.1rem; display:flex; align-items:center; gap:6px;">
+            <span>🔋</span>
+            <span id="pip-level">${this.currentLevel}%</span>
+          </div>
+        `;
+
+        this.pipLevelElem = pipWindow.document.getElementById('pip-level');
+      } catch (e) {}
+    }
+  }
+
   update(telemetry) {
-    if (!this.container || !telemetry) return;
+    if (!telemetry) return;
 
     const level = telemetry.level ?? 100;
     this.currentLevel = level;
 
-    if (this.levelElem) {
-      this.levelElem.textContent = `${level}%`;
-    }
+    if (this.container) {
+      if (this.levelElem) this.levelElem.textContent = `${level}%`;
 
-    if (this.iconFillElem) {
-      this.iconFillElem.style.width = `${level}%`;
+      if (this.iconFillElem) {
+        this.iconFillElem.style.width = `${level}%`;
 
-      if (level <= 20) {
-        this.iconFillElem.style.backgroundColor = 'var(--danger, #ff3b30)';
-        this.container.classList.add('critical');
-      } else if (level <= 45) {
-        this.iconFillElem.style.backgroundColor = 'var(--warning, #ffcc00)';
-        this.container.classList.remove('critical');
-      } else {
-        this.iconFillElem.style.backgroundColor = 'var(--accent, #34c759)';
-        this.container.classList.remove('critical');
+        if (level <= 20) {
+          this.iconFillElem.style.backgroundColor = 'var(--danger, #ff3b30)';
+          this.container.classList.add('critical');
+        } else if (level <= 45) {
+          this.iconFillElem.style.backgroundColor = 'var(--warning, #ffcc00)';
+          this.container.classList.remove('critical');
+        } else {
+          this.iconFillElem.style.backgroundColor = 'var(--accent, #34c759)';
+          this.container.classList.remove('critical');
+        }
       }
     }
+
+    if (this.pipLevelElem) {
+      this.pipLevelElem.textContent = `${level}%`;
+    }
+
+    this.updateSystemBadge(level);
+    this.updateSystemNotification(level, telemetry.charging);
   }
 
   setVisible(visible) {
@@ -211,7 +296,16 @@ export class GametimeOverlay {
   bindEvents() {
     if (!this.container) return;
 
+    const pipBtn = document.getElementById('gametime-pip-btn');
+    if (pipBtn) {
+      pipBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openFloatingPiP();
+      });
+    }
+
     const onStart = (e) => {
+      if (e.target.id === 'gametime-pip-btn') return;
       this.isDragging = true;
       this.hasMoved = false;
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
