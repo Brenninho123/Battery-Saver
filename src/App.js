@@ -1,6 +1,7 @@
 import { PowerEngine } from './Power.js';
 import { ConfigStorage } from './Storage.js';
 import { BatteryApi } from './BatteryApi.js';
+import { GametimeOverlay } from './Gametime.js';
 
 export class BatterySaverApp {
   constructor() {
@@ -8,6 +9,7 @@ export class BatterySaverApp {
     this.config = this.storage.load();
     this.engine = new PowerEngine();
     this.api = new BatteryApi(this.config.apiEndpoint);
+    this.gametime = new GametimeOverlay({ visible: this.config.gametimeOverlay });
     
     this.circumference = 2 * Math.PI * 70;
     this.lastSyncTime = 0;
@@ -36,6 +38,7 @@ export class BatterySaverApp {
       toggleFps: document.getElementById('toggle-fps'),
       toggleTasks: document.getElementById('toggle-tasks'),
       toggleAutosaver: document.getElementById('toggle-autosaver'),
+      toggleGametime: document.getElementById('toggle-gametime'),
       btnReset: document.getElementById('btn-reset'),
       apiStatusText: document.getElementById('api-status-text')
     };
@@ -45,6 +48,7 @@ export class BatterySaverApp {
 
   async init() {
     await this.engine.init();
+    this.gametime.init();
     
     if (this.config.samples && Array.isArray(this.config.samples)) {
       this.engine.drainSamples = this.config.samples;
@@ -64,6 +68,7 @@ export class BatterySaverApp {
     this.engine.subscribe((state) => {
       if (this.isPaused) return;
       this.render(state);
+      this.gametime.update(state.telemetry);
       this.handleCloudSync(state);
       this.dispatchEvent('telemetry', state);
     });
@@ -77,11 +82,13 @@ export class BatterySaverApp {
     if (this.dom.toggleFps) this.dom.toggleFps.checked = this.config.fpsCap;
     if (this.dom.toggleTasks) this.dom.toggleTasks.checked = this.config.taskLimit;
     if (this.dom.toggleAutosaver) this.dom.toggleAutosaver.checked = this.config.autoSaver;
+    if (this.dom.toggleGametime) this.dom.toggleGametime.checked = this.config.gametimeOverlay;
 
     this.setAmoledTheme(this.config.amoledMode, false);
     this.engine.setEcoMode(this.config.saverMode);
     this.engine.setFrameRateCap(this.config.fpsCap);
     this.engine.setThreadThrottle(this.config.taskLimit);
+    this.gametime.setVisible(this.config.gametimeOverlay);
   }
 
   saveState(showIndicator = true) {
@@ -326,6 +333,15 @@ export class BatterySaverApp {
     if (this.dom.toggleAutosaver) {
       this.dom.toggleAutosaver.addEventListener('change', (e) => {
         this.config.autoSaver = e.target.checked;
+        this.triggerHapticFeedback();
+        this.saveState();
+      });
+    }
+
+    if (this.dom.toggleGametime) {
+      this.dom.toggleGametime.addEventListener('change', (e) => {
+        this.config.gametimeOverlay = e.target.checked;
+        this.gametime.setVisible(e.target.checked);
         this.triggerHapticFeedback();
         this.saveState();
       });
