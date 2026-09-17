@@ -11,6 +11,7 @@ export class ConfigStorage {
       fpsCap: false,
       taskLimit: true,
       autoSaver: true,
+      gametimeOverlay: true,
       samples: [],
       apiEndpoint: '',
       cloudSync: false,
@@ -149,6 +150,7 @@ export class ConfigStorage {
     if (typeof config.fpsCap !== 'boolean') config.fpsCap = this.defaults.fpsCap;
     if (typeof config.taskLimit !== 'boolean') config.taskLimit = this.defaults.taskLimit;
     if (typeof config.autoSaver !== 'boolean') config.autoSaver = this.defaults.autoSaver;
+    if (typeof config.gametimeOverlay !== 'boolean') config.gametimeOverlay = this.defaults.gametimeOverlay;
     if (!Array.isArray(config.samples)) config.samples = [];
 
     return config;
