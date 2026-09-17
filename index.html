@@ -4,20 +4,28 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>Battery Saver</title>
+
+  <link rel="manifest" href="./manifest.json">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Battery Saver">
+  <link rel="apple-touch-icon" href="https://img.icons8.com/color/192/000000/full-battery.png">
+
   <style>
     :root {
       --bg: #000000;
-      --card-bg: rgba(18, 18, 22, 0.75);
-      --card-inner: #070709;
+      --card-bg: rgba(14, 14, 18, 0.82);
+      --card-inner: #050507;
       --border: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(52, 199, 89, 0.25);
+      --border-accent: rgba(52, 199, 89, 0.35);
       --text: #f2f2f7;
-      --text-dim: #8e8e93;
+      --text-dim: #7c7c80;
       --accent: #34c759;
       --warning: #ffcc00;
       --danger: #ff3b30;
       --ios-blue: #0a84ff;
-      --radius: 18px;
+      --radius: 20px;
     }
 
     * {
@@ -37,19 +45,19 @@
       justify-content: center;
       align-items: flex-start;
       padding: clamp(16px, 4vw, 32px) 16px;
-      transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
+      transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease, filter 0.35s ease;
       overflow-x: hidden;
     }
 
     body.engine-paused {
-      opacity: 0.4;
-      filter: grayscale(80%);
+      opacity: 0.35;
+      filter: grayscale(100%) blur(1px);
       pointer-events: none;
     }
 
     .dashboard {
       width: 100%;
-      max-width: 460px;
+      max-width: 480px;
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -59,15 +67,15 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 4px 0 12px 0;
+      padding: 4px 0 14px 0;
       border-bottom: 1px solid var(--border);
     }
 
     .brand h1 {
-      font-size: 1.3rem;
+      font-size: 1.35rem;
       font-weight: 800;
-      letter-spacing: -0.5px;
-      background: linear-gradient(135deg, #ffffff 0%, #8e8e93 100%);
+      letter-spacing: -0.6px;
+      background: linear-gradient(135deg, #ffffff 0%, #a1a1a6 100%);
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
     }
@@ -75,23 +83,24 @@
     .brand span {
       font-size: 0.65rem;
       color: var(--text-dim);
-      letter-spacing: 1px;
+      letter-spacing: 1.2px;
       text-transform: uppercase;
-      font-weight: 600;
+      font-weight: 700;
     }
 
     .platform-pill {
       font-size: 0.65rem;
-      padding: 4px 10px;
+      padding: 5px 12px;
       border-radius: 20px;
-      background: rgba(255, 255, 255, 0.05);
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
       color: var(--text);
       font-weight: 600;
       display: flex;
       align-items: center;
-      gap: 6px;
-      backdrop-filter: blur(12px);
+      gap: 8px;
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
     }
 
     .platform-pill .dot {
@@ -99,23 +108,23 @@
       height: 6px;
       border-radius: 50%;
       background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
+      box-shadow: 0 0 10px var(--accent);
       transition: background 0.3s ease, box-shadow 0.3s ease;
     }
 
     .platform-pill.paused .dot {
       background: var(--danger);
-      box-shadow: 0 0 8px var(--danger);
+      box-shadow: 0 0 10px var(--danger);
     }
 
     .card {
       background: var(--card-bg);
-      backdrop-filter: blur(24px);
-      -webkit-backdrop-filter: blur(24px);
+      backdrop-filter: blur(30px);
+      -webkit-backdrop-filter: blur(30px);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       padding: 22px;
-      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.6);
     }
 
     .gauge-wrapper {
@@ -124,30 +133,30 @@
       align-items: center;
       justify-content: center;
       position: relative;
-      margin: 8px 0;
+      margin: 10px 0;
     }
 
     .gauge-svg {
-      width: 210px;
-      height: 210px;
+      width: 220px;
+      height: 220px;
       transform: rotate(-90deg);
     }
 
     .gauge-bg {
       fill: none;
-      stroke: rgba(255, 255, 255, 0.04);
-      stroke-width: 12;
+      stroke: rgba(255, 255, 255, 0.03);
+      stroke-width: 14;
     }
 
     .gauge-fill {
       fill: none;
       stroke: var(--accent);
-      stroke-width: 12;
+      stroke-width: 14;
       stroke-linecap: round;
       stroke-dasharray: 440;
       stroke-dashoffset: 440;
       transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.5s ease;
-      filter: drop-shadow(0 0 8px rgba(52, 199, 89, 0.35));
+      filter: drop-shadow(0 0 12px rgba(52, 199, 89, 0.45));
     }
 
     .gauge-info {
@@ -158,9 +167,9 @@
     }
 
     .gauge-percentage {
-      font-size: 3.8rem;
+      font-size: 4rem;
       font-weight: 800;
-      letter-spacing: -2px;
+      letter-spacing: -2.5px;
       line-height: 1;
     }
 
@@ -169,7 +178,7 @@
       color: var(--text-dim);
       margin-top: 6px;
       text-transform: uppercase;
-      letter-spacing: 1.5px;
+      letter-spacing: 2px;
       font-weight: 700;
     }
 
@@ -184,7 +193,7 @@
       font-size: 0.75rem;
       text-transform: uppercase;
       color: var(--text-dim);
-      letter-spacing: 1px;
+      letter-spacing: 1.2px;
       font-weight: 700;
     }
 
@@ -351,7 +360,7 @@
       background-color: #ffffff;
       transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1);
       border-radius: 50%;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
     }
 
     input:checked + .ios-slider {
@@ -556,7 +565,7 @@
     import { BatterySaverApp } from './src/App.js';
 
     document.addEventListener('DOMContentLoaded', () => {
-      const appInstance = new BatterySaverApp();
+      new BatterySaverApp();
 
       const pauseEngine = () => {
         document.body.classList.add('engine-paused');
@@ -578,18 +587,25 @@
         }
       };
 
-      document.addEventListener('visibilitychange', () => {
-        if (document.hidden) {
-          pauseEngine();
-        } else {
-          resumeEngine();
-        }
+      const lifecycleEvents = [
+        { type: 'visibilitychange', target: document, handler: () => document.hidden ? pauseEngine() : resumeEngine() },
+        { type: 'blur', target: window, handler: pauseEngine },
+        { type: 'focus', target: window, handler: resumeEngine },
+        { type: 'pagehide', target: window, handler: pauseEngine },
+        { type: 'pageshow', target: window, handler: resumeEngine },
+        { type: 'freeze', target: document, handler: pauseEngine },
+        { type: 'resume', target: document, handler: resumeEngine }
+      ];
+
+      lifecycleEvents.forEach(({ type, target, handler }) => {
+        target.addEventListener(type, handler, { passive: true });
       });
 
-      window.addEventListener('blur', () => pauseEngine());
-      window.addEventListener('focus', () => resumeEngine());
-      window.addEventListener('pagehide', () => pauseEngine());
-      window.addEventListener('pageshow', () => resumeEngine());
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('./sw.js').catch(() => {});
+        });
+      }
     });
   </script>
 </body>
