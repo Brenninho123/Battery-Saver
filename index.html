@@ -534,6 +534,17 @@
             <span class="ios-slider"></span>
           </label>
         </div>
+
+        <div class="toggle-item">
+          <div class="toggle-info">
+            <span class="toggle-name">Gametime Corner Widget</span>
+            <span class="toggle-desc">Floating battery HUD widget overlay</span>
+          </div>
+          <label class="ios-switch">
+            <input type="checkbox" id="toggle-gametime" checked>
+            <span class="ios-slider"></span>
+          </label>
+        </div>
       </div>
     </div>
 
@@ -552,11 +563,8 @@
         const pill = document.getElementById('platform-pill');
         if (pill) pill.classList.add('paused');
 
-        if (window.App && window.App.engine) {
-          window.App.engine.destroy();
-        }
-        if (window.App && typeof window.App.releaseScreenWakeLock === 'function') {
-          window.App.releaseScreenWakeLock();
+        if (window.App && typeof window.App.pauseExecution === 'function') {
+          window.App.pauseExecution();
         }
       };
 
@@ -565,8 +573,8 @@
         const pill = document.getElementById('platform-pill');
         if (pill) pill.classList.remove('paused');
 
-        if (window.App && window.App.engine) {
-          window.App.engine.init();
+        if (window.App && typeof window.App.resumeExecution === 'function') {
+          window.App.resumeExecution();
         }
       };
 
