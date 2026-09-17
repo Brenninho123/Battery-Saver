@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Battery Saver Engine</title>
+  <style>
+    :root {
+      --bg: #000000;
+      --card-bg: #0d0d0d;
+      --border: #1f1f1f;
+      --text: #e0e0e0;
+      --text-dim: #777777;
+      --accent: #00ff66;
+      --warning: #ffb700;
+      --danger: #ff3333;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+    }
+
+    .dashboard {
+      width: 100%;
+      max-width: 440px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .header h1 {
+      font-size: 1.1rem;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      font-weight: 700;
+    }
+
+    .badge {
+      font-size: 0.75rem;
+      padding: 4px 8px;
+      border-radius: 4px;
+      background: #151515;
+      color: var(--text-dim);
+      border: 1px solid var(--border);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px;
+    }
+
+    .gauge-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      margin: 10px 0;
+    }
+
+    .gauge-svg {
+      width: 180px;
+      height: 180px;
+      transform: rotate(-90deg);
+    }
+
+    .gauge-bg {
+      fill: none;
+      stroke: #1a1a1a;
+      stroke-width: 10;
+    }
+
+    .gauge-fill {
+      fill: none;
+      stroke: var(--accent);
+      stroke-width: 10;
+      stroke-linecap: round;
+      stroke-dasharray: 440;
+      stroke-dashoffset: 440;
+      transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease;
+    }
+
+    .gauge-metrics {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .percentage {
+      font-size: 2.8rem;
+      font-weight: 800;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+
+    .state {
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .metric-item {
+      background: #050505;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+
+    .metric-label {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 0.95rem;
+      font-weight: 600;
+    }
+
+    .controls-title {
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      color: var(--text-dim);
+      letter-spacing: 0.5px;
+      margin-bottom: 12px;
+    }
+
+    .toggle-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 0;
+      border-bottom: 1px solid #141414;
+    }
+
+    .toggle-row:last-child {
+      border-bottom: none;
+    }
+
+    .toggle-label {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .toggle-title {
+      font-size: 0.85rem;
+      font-weight: 500;
+    }
+
+    .toggle-desc {
+      font-size: 0.7rem;
+      color: var(--text-dim);
+    }
+
+    .switch {
+      position: relative;
+      display: inline-block;
+      width: 44px;
+      height: 24px;
+    }
+
+    .switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #222;
+      transition: 0.3s;
+      border-radius: 24px;
+      border: 1px solid var(--border);
+    }
+
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 3px;
+      bottom: 3px;
+      background-color: var(--text-dim);
+      transition: 0.3s;
+      border-radius: 50%;
+    }
+
+    input:checked + .slider {
+      background-color: var(--accent);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(20px);
+      background-color: #000;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="dashboard">
+    <div class="header">
+      <h1>Battery Saver</h1>
+      <div class="badge" id="engine-status">Active</div>
+    </div>
+
+    <div class="card">
+      <div class="gauge-container">
+        <svg class="gauge-svg" viewBox="0 0 160 160">
+          <circle class="gauge-bg" cx="80" cy="80" r="70"></circle>
+          <circle class="gauge-fill" id="gauge-fill" cx="80" cy="80" r="70"></circle>
+        </svg>
+        <div class="gauge-metrics">
+          <span class="percentage" id="level-display">--%</span>
+          <span class="state" id="status-display">INITIALIZING</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="metrics-grid">
+      <div class="metric-item">
+        <div class="metric-label">Discharge Time</div>
+        <div class="metric-value" id="discharging-time">--</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Charge Time</div>
+        <div class="metric-value" id="charging-time">--</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Power Profile</div>
+        <div class="metric-value" id="profile-status">Standard</div>
+      </div>
+      <div class="metric-item">
+        <div class="metric-label">Thread Governor</div>
+        <div class="metric-value" id="governor-status">Normal</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="controls-title">Optimization Triggers</div>
+      
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="toggle-title">Aggressive Power Saver</span>
+          <span class="toggle-desc">Throttle execution rate & DOM updates</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-saver">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="toggle-title">AMOLED Blackout Mode</span>
+          <span class="toggle-desc">Force true black canvas render</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-amoled" checked>
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="toggle-title">Hardware Concurrency Limit</span>
+          <span class="toggle-desc">Suppress background async tasks</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-threads">
+          <span class="slider"></span>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    class PowerOptimizerEngine {
+      constructor() {
+        this.battery = null;
+        this.saverMode = false;
+        this.concurrencyLimited = false;
+        this.workerInterval = null;
+        this.circumference = 2 * Math.PI * 70;
+
+        this.dom = {
+          gaugeFill: document.getElementById('gauge-fill'),
+          levelDisplay: document.getElementById('level-display'),
+          statusDisplay: document.getElementById('status-display'),
+          dischargingTime: document.getElementById('discharging-time'),
+          chargingTime: document.getElementById('charging-time'),
+          profileStatus: document.getElementById('profile-status'),
+          governorStatus: document.getElementById('governor-status'),
+          engineStatus: document.getElementById('engine-status'),
+          toggleSaver: document.getElementById('toggle-saver'),
+          toggleAmoled: document.getElementById('toggle-amoled'),
+          toggleThreads: document.getElementById('toggle-threads')
+        };
+
+        this.init();
+      }
+
+      async init() {
+        this.bindEvents();
+        if ('getBattery' in navigator) {
+          try {
+            this.battery = await navigator.getBattery();
+            this.attachBatteryListeners();
+            this.updateBatteryUI();
+          } catch (e) {
+            this.fallbackState();
+          }
+        } else {
+          this.fallbackState();
+        }
+      }
+
+      attachBatteryListeners() {
+        const events = ['levelchange', 'chargingchange', 'dischargingtimechange', 'chargingtimechange'];
+        events.forEach(event => {
+          this.battery.addEventListener(event, () => this.updateBatteryUI());
+        });
+      }
+
+      formatTime(seconds) {
+        if (!isFinite(seconds) || seconds === 0) return 'N/A';
+        const h = Math.floor(seconds / 3600);
+        const m = Math.floor((seconds % 3600) / 60);
+        return h > 0 ? `${h}h ${m}m` : `${m}m`;
+      }
+
+      updateBatteryUI() {
+        if (!this.battery) return;
+
+        const level = this.battery.level;
+        const percentage = Math.round(level * 100);
+        const offset = this.circumference - (level * this.circumference);
+
+        this.dom.gaugeFill.style.strokeDasharray = `${this.circumference}`;
+        this.dom.gaugeFill.style.strokeDashoffset = offset;
+        this.dom.levelDisplay.textContent = `${percentage}%`;
+
+        if (percentage <= 20) {
+          this.dom.gaugeFill.style.stroke = 'var(--danger)';
+        } else if (percentage <= 45) {
+          this.dom.gaugeFill.style.stroke = 'var(--warning)';
+        } else {
+          this.dom.gaugeFill.style.stroke = 'var(--accent)';
+        }
+
+        if (this.battery.charging) {
+          this.dom.statusDisplay.textContent = 'CHARGING';
+          this.dom.chargingTime.textContent = this.formatTime(this.battery.chargingTime);
+          this.dom.dischargingTime.textContent = 'N/A';
+        } else {
+          this.dom.statusDisplay.textContent = 'DISCHARGING';
+          this.dom.dischargingTime.textContent = this.formatTime(this.battery.dischargingTime);
+          this.dom.chargingTime.textContent = 'N/A';
+        }
+
+        if (percentage <= 15 && !this.battery.charging && !this.saverMode) {
+          this.dom.toggleSaver.checked = true;
+          this.setSaverMode(true);
+        }
+      }
+
+      fallbackState() {
+        this.dom.statusDisplay.textContent = 'UNSUPPORTED';
+        this.dom.levelDisplay.textContent = 'N/A';
+        this.dom.engineStatus.textContent = 'RESTRICTED';
+        this.dom.engineStatus.style.color = 'var(--danger)';
+      }
+
+      setSaverMode(enable) {
+        this.saverMode = enable;
+        this.dom.profileStatus.textContent = enable ? 'ECO (Throttled)' : 'Standard';
+        this.dom.profileStatus.style.color = enable ? 'var(--accent)' : 'var(--text)';
+        
+        if (enable) {
+          document.body.classList.add('eco-render');
+        } else {
+          document.body.classList.remove('eco-render');
+        }
+      }
+
+      setThreadGovernor(enable) {
+        this.concurrencyLimited = enable;
+        this.dom.governorStatus.textContent = enable ? 'Restricted (1 Thread)' : 'Normal';
+        this.dom.governorStatus.style.color = enable ? 'var(--warning)' : 'var(--text)';
+      }
+
+      setAmoledTheme(enable) {
+        document.documentElement.style.setProperty('--bg', enable ? '#000000' : '#0a0a0c');
+        document.documentElement.style.setProperty('--card-bg', enable ? '#0d0d0d' : '#141418');
+      }
+
+      bindEvents() {
+        this.dom.toggleSaver.addEventListener('change', (e) => {
+          this.setSaverMode(e.target.checked);
+        });
+
+        this.dom.toggleAmoled.addEventListener('change', (e) => {
+          this.setAmoledTheme(e.target.checked);
+        });
+
+        this.dom.toggleThreads.addEventListener('change', (e) => {
+          this.setThreadGovernor(e.target.checked);
+        });
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      window.Engine = new PowerOptimizerEngine();
+    });
+  </script>
+</body>
+</html>
