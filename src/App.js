@@ -11,9 +11,10 @@ export class BatterySaverApp {
     
     this.circumference = 2 * Math.PI * 70;
     this.lastSyncTime = 0;
-    this.syncIntervalMs = 60000;
+    this.syncIntervalMs = this.config.syncInterval || 60000;
     this.sessionStartTime = Date.now();
     this.wakeLock = null;
+    this.isPaused = false;
 
     this.dom = {
       gaugeFill: document.getElementById('gauge-fill'),
@@ -58,11 +59,13 @@ export class BatterySaverApp {
     this.bindEvents();
     this.initVisibilityGovernor();
     this.initNetworkMonitor();
+    this.initHardwareMetrics();
 
     this.engine.subscribe((state) => {
+      if (this.isPaused) return;
       this.render(state);
       this.handleCloudSync(state);
-      this.dispatchEvent('batterychange', state);
+      this.dispatchEvent('telemetry', state);
     });
 
     this.engine.notifyState();
@@ -106,7 +109,7 @@ export class BatterySaverApp {
   }
 
   async requestScreenWakeLock() {
-    if ('wakeLock' in navigator) {
+    if ('wakeLock' in navigator && !this.wakeLock) {
       try {
         this.wakeLock = await navigator.wakeLock.request('screen');
       } catch (e) {
@@ -123,12 +126,29 @@ export class BatterySaverApp {
     }
   }
 
+  pauseExecution() {
+    this.isPaused = true;
+    this.engine.setFrameRateCap(true);
+    this.releaseScreenWakeLock();
+    this.dispatchEvent('pause');
+  }
+
+  resumeExecution() {
+    this.isPaused = false;
+    this.engine.setFrameRateCap(this.config.fpsCap);
+    if (!this.config.saverMode) {
+      this.requestScreenWakeLock();
+    }
+    this.engine.notifyState();
+    this.dispatchEvent('resume');
+  }
+
   initVisibilityGovernor() {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) {
-        this.engine.setFrameRateCap(true);
+        this.pauseExecution();
       } else {
-        this.engine.setFrameRateCap(this.config.fpsCap);
+        this.resumeExecution();
       }
     });
   }
@@ -149,7 +169,14 @@ export class BatterySaverApp {
     }
   }
 
-  triggerHapticFeedback(pattern = [50]) {
+  initHardwareMetrics() {
+    const platform = PowerEngine.getPlatformInfo();
+    if (platform.hardwareConcurrency <= 2 && !this.config.saverMode) {
+      this.engine.setThreadThrottle(true);
+    }
+  }
+
+  triggerHapticFeedback(pattern = [40]) {
     if ('vibrate' in navigator && !this.config.saverMode) {
       navigator.vibrate(pattern);
     }
@@ -235,10 +262,10 @@ export class BatterySaverApp {
     if (this.dom.diagnosticLogs) {
       let logs = [];
       if (wearAnalysis.unstableSpikes > 0) {
-        logs.push({ text: `Detected ${wearAnalysis.unstableSpikes} sudden capacity drop irregularity.`, color: 'var(--danger)' });
+        logs.push({ text: `Detected ${wearAnalysis.unstableSpikes} capacity drop anomaly. Wear risk detected.`, color: 'var(--danger)' });
       }
       if (wearAnalysis.drainRatePerMin > 1.2) {
-        logs.push({ text: 'High discharge rate recorded during cycle.', color: 'var(--warning)' });
+        logs.push({ text: 'High discharge velocity logged during passive cycle.', color: 'var(--warning)' });
       }
       if (logs.length === 0) {
         logs.push({ text: 'Discharge slope is stable. Cell wear profile optimal.', color: 'var(--accent)' });
