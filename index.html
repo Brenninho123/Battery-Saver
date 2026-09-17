@@ -10,14 +10,12 @@
       --card-bg: rgba(18, 18, 20, 0.75);
       --card-inner: #0a0a0c;
       --border: rgba(255, 255, 255, 0.08);
-      --border-accent: rgba(52, 199, 89, 0.3);
       --text: #f2f2f7;
       --text-dim: #8e8e93;
       --accent: #34c759;
       --warning: #ffcc00;
       --danger: #ff3b30;
       --ios-blue: #0a84ff;
-      --ios-purple: #bf5af2;
       --radius: 16px;
     }
 
@@ -32,7 +30,7 @@
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Helvetica Neue", sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
       min-height: 100vh;
       display: flex;
       justify-content: center;
@@ -56,11 +54,6 @@
       align-items: center;
       padding: 4px 0 12px 0;
       border-bottom: 1px solid var(--border);
-    }
-
-    .brand {
-      display: flex;
-      flex-direction: column;
     }
 
     .brand h1 {
@@ -501,6 +494,17 @@
 
         <div class="toggle-item">
           <div class="toggle-info">
+            <span class="toggle-name">Background Task Limiter</span>
+            <span class="toggle-desc">Suppress async background execution</span>
+          </div>
+          <label class="ios-switch">
+            <input type="checkbox" id="toggle-tasks" checked>
+            <span class="ios-slider"></span>
+          </label>
+        </div>
+
+        <div class="toggle-item">
+          <div class="toggle-info">
             <span class="toggle-name">Auto Low Battery Safeguard</span>
             <span class="toggle-desc">Engage max saver automatically at <= 20%</span>
           </div>
@@ -515,340 +519,6 @@
     <button class="btn-secondary" id="btn-reset">Reset Telemetry & Settings</button>
   </div>
 
-  <script>
-    class PlatformBridge {
-      static detectPlatform() {
-        const ua = navigator.userAgent || navigator.vendor || window.opera;
-        const isIOS = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-        const isAndroid = /Android/.test(ua);
-
-        if (isIOS) return { name: 'iOS Native WebKit', os: 'ios' };
-        if (isAndroid) return { name: 'Android Native', os: 'android' };
-        return { name: 'Web Engine', os: 'desktop' };
-      }
-    }
-
-    class ConfigStorage {
-      constructor(key = 'battery_saver_app_data') {
-        this.STORAGE_KEY = key;
-        this.defaults = {
-          saverMode: false,
-          amoledMode: true,
-          fpsCap: false,
-          autoSaver: true,
-          samples: []
-        };
-      }
-
-      load() {
-        try {
-          const raw = localStorage.getItem(this.STORAGE_KEY);
-          return raw ? { ...this.defaults, ...JSON.parse(raw) } : { ...this.defaults };
-        } catch (e) {
-          return { ...this.defaults };
-        }
-      }
-
-      save(config) {
-        try {
-          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
-          return true;
-        } catch (e) {
-          return false;
-        }
-      }
-
-      clear() {
-        try {
-          localStorage.removeItem(this.STORAGE_KEY);
-          return true;
-        } catch (e) {
-          return false;
-        }
-      }
-    }
-
-    class BatteryDiagnosticEngine {
-      constructor(engine) {
-        this.engine = engine;
-        this.samples = engine.config.samples || [];
-        this.maxSamples = 40;
-      }
-
-      pushSample(level, charging) {
-        const timestamp = Date.now();
-        this.samples.push({ timestamp, level, charging });
-
-        if (this.samples.length > this.maxSamples) {
-          this.samples.shift();
-        }
-
-        this.engine.config.samples = this.samples;
-        this.engine.saveState(false);
-        this.runDiagnostics();
-      }
-
-      runDiagnostics() {
-        const dom = this.engine.dom;
-        dom.sampleCount.textContent = `${this.samples.length} Samples`;
-
-        if (this.samples.length < 3) {
-          dom.healthScore.textContent = 'Gathering Data...';
-          dom.healthTag.textContent = 'Scanning';
-          dom.healthTag.className = 'status-badge optimal';
-          return;
-        }
-
-        let rapidDrops = 0;
-        let totalDrainRate = 0;
-        let validIntervals = 0;
-
-        for (let i = 1; i < this.samples.length; i++) {
-          const prev = this.samples[i - 1];
-          const curr = this.samples[i];
-          const timeMin = (curr.timestamp - prev.timestamp) / 60000;
-
-          if (!curr.charging && !prev.charging && timeMin > 0) {
-            const drop = prev.level - curr.level;
-            if (drop > 0) {
-              const rate = drop / timeMin;
-              totalDrainRate += rate;
-              validIntervals++;
-
-              if (drop >= 4 && timeMin < 2) {
-                rapidDrops++;
-              }
-            }
-          }
-        }
-
-        const avgDrainRate = validIntervals > 0 ? (totalDrainRate / validIntervals).toFixed(2) : 0;
-        dom.drainRate.textContent = `${avgDrainRate} %/min`;
-
-        let logs = [];
-        let statusClass = 'optimal';
-        let statusText = 'Optimal';
-        let healthLabel = 'No Wear Defect Detected';
-
-        if (rapidDrops > 0) {
-          statusClass = 'degraded';
-          statusText = 'Wear Defect';
-          healthLabel = 'Severe Voltage Spikes';
-          logs.push({ text: `Detected ${rapidDrops} capacity drop irregularity (Potential Memory/Wear Flaw).`, color: 'var(--danger)' });
-        }
-
-        if (avgDrainRate > 1.2) {
-          if (statusClass !== 'degraded') {
-            statusClass = 'warning';
-            statusText = 'High Drain';
-            healthLabel = 'Elevated Degradation Rate';
-          }
-          logs.push({ text: 'High discharge velocity logged during passive cycle.', color: 'var(--warning)' });
-        }
-
-        if (logs.length === 0) {
-          logs.push({ text: 'Discharge slope is stable. Battery cell health is optimal.', color: 'var(--accent)' });
-        }
-
-        dom.healthScore.textContent = healthLabel;
-        dom.healthTag.textContent = statusText;
-        dom.healthTag.className = `status-badge ${statusClass}`;
-
-        dom.diagnosticLogs.innerHTML = logs.map(l => `
-          <div class="log-row">
-            <div class="log-indicator" style="background: ${l.color};"></div>
-            <span>${l.text}</span>
-          </div>
-        `).join('');
-
-        dom.voltageState.textContent = rapidDrops > 0 ? 'Unstable Spikes' : 'Normal';
-        dom.voltageState.style.color = rapidDrops > 0 ? 'var(--danger)' : 'var(--accent)';
-      }
-    }
-
-    class BatterySaverApp {
-      constructor() {
-        this.storage = new ConfigStorage();
-        this.config = this.storage.load();
-        this.platform = PlatformBridge.detectPlatform();
-        this.diagnostic = new BatteryDiagnosticEngine(this);
-        this.battery = null;
-        this.circumference = 2 * Math.PI * 70;
-        this.targetFPS = 60;
-
-        this.dom = {
-          gaugeFill: document.getElementById('gauge-fill'),
-          levelDisplay: document.getElementById('level-display'),
-          statusDisplay: document.getElementById('status-display'),
-          remainingTime: document.getElementById('remaining-time'),
-          drainRate: document.getElementById('drain-rate'),
-          voltageState: document.getElementById('voltage-state'),
-          osPowerMode: document.getElementById('os-power-mode'),
-          healthScore: document.getElementById('health-score'),
-          healthTag: document.getElementById('health-tag'),
-          diagnosticLogs: document.getElementById('diagnostic-logs'),
-          sampleCount: document.getElementById('sample-count'),
-          platformName: document.getElementById('platform-name'),
-          platformDot: document.getElementById('platform-dot'),
-          syncIndicator: document.getElementById('sync-indicator'),
-          toggleSaver: document.getElementById('toggle-saver'),
-          toggleAmoled: document.getElementById('toggle-amoled'),
-          toggleFps: document.getElementById('toggle-fps'),
-          toggleAutosaver: document.getElementById('toggle-autosaver'),
-          btnReset: document.getElementById('btn-reset')
-        };
-
-        this.init();
-      }
-
-      async init() {
-        this.dom.platformName.textContent = this.platform.name;
-        this.applyStoredUI();
-        this.bindEvents();
-        this.initEngineLoop();
-
-        if ('getBattery' in navigator) {
-          try {
-            this.battery = await navigator.getBattery();
-            this.setupBatteryListeners();
-            this.updateBatteryStatus();
-          } catch (e) {
-            this.setupiOSFallback();
-          }
-        } else {
-          this.setupiOSFallback();
-        }
-      }
-
-      applyStoredUI() {
-        this.dom.toggleSaver.checked = this.config.saverMode;
-        this.dom.toggleAmoled.checked = this.config.amoledMode;
-        this.dom.toggleFps.checked = this.config.fpsCap;
-        this.dom.toggleAutosaver.checked = this.config.autoSaver;
-
-        this.setAmoledTheme(this.config.amoledMode, false);
-        this.setFPSCap(this.config.fpsCap, false);
-      }
-
-      saveState(showIndicator = true) {
-        const saved = this.storage.save(this.config);
-        if (saved && showIndicator) {
-          this.dom.syncIndicator.classList.add('active');
-          setTimeout(() => this.dom.syncIndicator.classList.remove('active'), 1000);
-        }
-      }
-
-      setupBatteryListeners() {
-        const events = ['levelchange', 'chargingchange', 'dischargingtimechange', 'chargingtimechange'];
-        events.forEach(evt => this.battery.addEventListener(evt, () => this.updateBatteryStatus()));
-      }
-
-      formatTime(seconds) {
-        if (!isFinite(seconds) || seconds === 0) return 'N/A';
-        const h = Math.floor(seconds / 3600);
-        const m = Math.floor((seconds % 3600) / 60);
-        return h > 0 ? `${h}h ${m}m` : `${m}m`;
-      }
-
-      updateBatteryStatus() {
-        if (!this.battery) return;
-
-        const level = this.battery.level;
-        const percentage = Math.round(level * 100);
-        const offset = this.circumference - (level * this.circumference);
-
-        this.dom.gaugeFill.style.strokeDasharray = `${this.circumference}`;
-        this.dom.gaugeFill.style.strokeDashoffset = offset;
-        this.dom.levelDisplay.textContent = `${percentage}%`;
-
-        if (percentage <= 20) {
-          this.dom.gaugeFill.style.stroke = 'var(--danger)';
-        } else if (percentage <= 45) {
-          this.dom.gaugeFill.style.stroke = 'var(--warning)';
-        } else {
-          this.dom.gaugeFill.style.stroke = 'var(--accent)';
-        }
-
-        if (this.battery.charging) {
-          this.dom.statusDisplay.textContent = 'CHARGING';
-          this.dom.remainingTime.textContent = this.formatTime(this.battery.chargingTime);
-        } else {
-          this.dom.statusDisplay.textContent = 'DISCHARGING';
-          this.dom.remainingTime.textContent = this.formatTime(this.battery.dischargingTime);
-        }
-
-        this.diagnostic.pushSample(percentage, this.battery.charging);
-
-        if (percentage <= 20 && !this.battery.charging && this.config.autoSaver && !this.config.saverMode) {
-          this.dom.toggleSaver.checked = true;
-          this.config.saverMode = true;
-          this.saveState();
-        }
-      }
-
-      setupiOSFallback() {
-        this.dom.statusDisplay.textContent = 'OS STANDBY';
-        this.dom.levelDisplay.textContent = '100%';
-        this.dom.remainingTime.textContent = 'N/A';
-        this.dom.osPowerMode.textContent = 'Low Power Detection';
-        
-        const offset = this.circumference - (1.0 * this.circumference);
-        this.dom.gaugeFill.style.strokeDasharray = `${this.circumference}`;
-        this.dom.gaugeFill.style.strokeDashoffset = offset;
-      }
-
-      setAmoledTheme(enable, save = true) {
-        this.config.amoledMode = enable;
-        document.documentElement.style.setProperty('--bg', enable ? '#000000' : '#0a0a0c');
-        if (save) this.saveState();
-      }
-
-      setFPSCap(enable, save = true) {
-        this.config.fpsCap = enable;
-        this.targetFPS = enable ? 30 : 60;
-        if (save) this.saveState();
-      }
-
-      initEngineLoop() {
-        let lastTime = performance.now();
-        const loop = (now) => {
-          const delta = now - lastTime;
-          const interval = 1000 / this.targetFPS;
-          if (delta >= interval) {
-            lastTime = now - (delta % interval);
-          }
-          requestAnimationFrame(loop);
-        };
-        requestAnimationFrame(loop);
-      }
-
-      bindEvents() {
-        this.dom.toggleSaver.addEventListener('change', (e) => {
-          this.config.saverMode = e.target.checked;
-          this.saveState();
-        });
-
-        this.dom.toggleAmoled.addEventListener('change', (e) => this.setAmoledTheme(e.target.checked));
-        this.dom.toggleFps.addEventListener('change', (e) => this.setFPSCap(e.target.checked));
-        
-        this.dom.toggleAutosaver.addEventListener('change', (e) => {
-          this.config.autoSaver = e.target.checked;
-          this.saveState();
-        });
-
-        this.dom.btnReset.addEventListener('click', () => {
-          this.storage.clear();
-          this.config = this.storage.load();
-          this.diagnostic = new BatteryDiagnosticEngine(this);
-          this.applyStoredUI();
-          if (this.battery) this.updateBatteryStatus();
-        });
-      }
-    }
-
-    document.addEventListener('DOMContentLoaded', () => {
-      window.App = new BatterySaverApp();
-    });
-  </script>
+  <script type="module" src="./src/App.js"></script>
 </body>
 </html>
