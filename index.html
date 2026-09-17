@@ -7,16 +7,17 @@
   <style>
     :root {
       --bg: #000000;
-      --card-bg: rgba(18, 18, 20, 0.75);
-      --card-inner: #0a0a0c;
+      --card-bg: rgba(18, 18, 22, 0.75);
+      --card-inner: #070709;
       --border: rgba(255, 255, 255, 0.08);
+      --border-accent: rgba(52, 199, 89, 0.25);
       --text: #f2f2f7;
       --text-dim: #8e8e93;
       --accent: #34c759;
       --warning: #ffcc00;
       --danger: #ff3b30;
       --ios-blue: #0a84ff;
-      --radius: 16px;
+      --radius: 18px;
     }
 
     * {
@@ -30,14 +31,20 @@
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, sans-serif;
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: flex-start;
       padding: clamp(16px, 4vw, 32px) 16px;
-      transition: background-color 0.4s ease;
+      transition: background-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.3s ease;
       overflow-x: hidden;
+    }
+
+    body.engine-paused {
+      opacity: 0.4;
+      filter: grayscale(80%);
+      pointer-events: none;
     }
 
     .dashboard {
@@ -57,7 +64,7 @@
     }
 
     .brand h1 {
-      font-size: 1.25rem;
+      font-size: 1.3rem;
       font-weight: 800;
       letter-spacing: -0.5px;
       background: linear-gradient(135deg, #ffffff 0%, #8e8e93 100%);
@@ -84,7 +91,7 @@
       display: flex;
       align-items: center;
       gap: 6px;
-      backdrop-filter: blur(10px);
+      backdrop-filter: blur(12px);
     }
 
     .platform-pill .dot {
@@ -93,16 +100,22 @@
       border-radius: 50%;
       background: var(--accent);
       box-shadow: 0 0 8px var(--accent);
+      transition: background 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .platform-pill.paused .dot {
+      background: var(--danger);
+      box-shadow: 0 0 8px var(--danger);
     }
 
     .card {
       background: var(--card-bg);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
+      backdrop-filter: blur(24px);
+      -webkit-backdrop-filter: blur(24px);
       border: 1px solid var(--border);
       border-radius: var(--radius);
-      padding: 20px;
-      box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+      padding: 22px;
+      box-shadow: 0 12px 40px 0 rgba(0, 0, 0, 0.45);
     }
 
     .gauge-wrapper {
@@ -122,7 +135,7 @@
 
     .gauge-bg {
       fill: none;
-      stroke: rgba(255, 255, 255, 0.05);
+      stroke: rgba(255, 255, 255, 0.04);
       stroke-width: 12;
     }
 
@@ -134,7 +147,7 @@
       stroke-dasharray: 440;
       stroke-dashoffset: 440;
       transition: stroke-dashoffset 1s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.5s ease;
-      filter: drop-shadow(0 0 6px rgba(52, 199, 89, 0.4));
+      filter: drop-shadow(0 0 8px rgba(52, 199, 89, 0.35));
     }
 
     .gauge-info {
@@ -178,7 +191,7 @@
     .health-container {
       background: var(--card-inner);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 16px;
       display: flex;
       flex-direction: column;
@@ -278,7 +291,7 @@
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 12px 0;
+      padding: 14px 0;
       border-bottom: 1px solid rgba(255, 255, 255, 0.04);
     }
 
@@ -514,7 +527,7 @@
         <div class="toggle-item">
           <div class="toggle-info">
             <span class="toggle-name">Auto Low Battery Safeguard</span>
-            <span class="toggle-desc">Engage max saver automatically at <= 20%</span>
+            <span class="toggle-desc">Engage max saver automatically at &lt;= 20%</span>
           </div>
           <label class="ios-switch">
             <input type="checkbox" id="toggle-autosaver" checked>
@@ -528,6 +541,48 @@
     <button class="btn-secondary" id="btn-reset">Reset Telemetry & Settings</button>
   </div>
 
-  <script type="module" src="./src/App.js"></script>
+  <script type="module">
+    import { BatterySaverApp } from './src/App.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const appInstance = new BatterySaverApp();
+
+      const pauseEngine = () => {
+        document.body.classList.add('engine-paused');
+        const pill = document.getElementById('platform-pill');
+        if (pill) pill.classList.add('paused');
+
+        if (window.App && window.App.engine) {
+          window.App.engine.destroy();
+        }
+        if (window.App && typeof window.App.releaseScreenWakeLock === 'function') {
+          window.App.releaseScreenWakeLock();
+        }
+      };
+
+      const resumeEngine = () => {
+        document.body.classList.remove('engine-paused');
+        const pill = document.getElementById('platform-pill');
+        if (pill) pill.classList.remove('paused');
+
+        if (window.App && window.App.engine) {
+          window.App.engine.init();
+        }
+      };
+
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) {
+          pauseEngine();
+        } else {
+          resumeEngine();
+        }
+      });
+
+      window.addEventListener('blur', () => pauseEngine());
+      window.addEventListener('focus', () => resumeEngine());
+      window.addEventListener('pagehide', () => pauseEngine());
+      window.addEventListener('pageshow', () => resumeEngine());
+    });
+  </script>
 </body>
 </html>
