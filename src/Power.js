@@ -21,7 +21,7 @@ export class PowerEngine {
       isIOS,
       isAndroid,
       isMobile: isIOS || isAndroid,
-      platformName: isIOS ? 'iOS WebKit Engine' : isAndroid ? 'Android BatteryManager' : 'Desktop Standard',
+      platformName: isIOS ? 'iOS WebKit Engine' : isAndroid ? 'Android BatteryManager' : 'Desktop Engine',
       hardwareConcurrency: navigator.hardwareConcurrency || 2,
       deviceMemory: navigator.deviceMemory || 'Unknown'
     };
@@ -34,7 +34,6 @@ export class PowerEngine {
         this._bindBatteryEvents();
         this.recordTelemetrySample();
       } catch (e) {
-        // Fallback for missing/restricted APIs
       }
     }
     this._startGovernorLoop();
