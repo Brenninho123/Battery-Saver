@@ -1,12 +1,16 @@
 import { PowerEngine } from './Power.js';
 import { ConfigStorage } from './Storage.js';
+import { BatteryApi } from './BatteryApi.js';
 
 export class BatterySaverApp {
   constructor() {
     this.storage = new ConfigStorage();
     this.config = this.storage.load();
     this.engine = new PowerEngine();
+    this.api = new BatteryApi(this.config.apiEndpoint);
     this.circumference = 2 * Math.PI * 70;
+    this.lastSyncTime = 0;
+    this.syncIntervalMs = 60000;
 
     this.dom = {
       gaugeFill: document.getElementById('gauge-fill'),
@@ -28,7 +32,8 @@ export class BatterySaverApp {
       toggleFps: document.getElementById('toggle-fps'),
       toggleTasks: document.getElementById('toggle-tasks'),
       toggleAutosaver: document.getElementById('toggle-autosaver'),
-      btnReset: document.getElementById('btn-reset')
+      btnReset: document.getElementById('btn-reset'),
+      apiStatusText: document.getElementById('api-status-text')
     };
 
     this.init();
@@ -47,7 +52,11 @@ export class BatterySaverApp {
     this.applyStoredUI();
     this.bindEvents();
 
-    this.engine.subscribe((state) => this.render(state));
+    this.engine.subscribe((state) => {
+      this.render(state);
+      this.handleCloudSync(state);
+    });
+
     this.engine.notifyState();
   }
 
@@ -84,6 +93,21 @@ export class BatterySaverApp {
     this.config.amoledMode = enable;
     document.documentElement.style.setProperty('--bg', enable ? '#000000' : '#0a0a0c');
     if (save) this.saveState();
+  }
+
+  async handleCloudSync(state) {
+    if (!this.config.cloudSync || !this.config.apiEndpoint) return;
+    
+    const now = Date.now();
+    if (now - this.lastSyncTime >= this.syncIntervalMs) {
+      this.lastSyncTime = now;
+      if (this.dom.apiStatusText) this.dom.apiStatusText.textContent = 'Syncing Telemetry...';
+      
+      const result = await this.api.syncTelemetry(state);
+      if (this.dom.apiStatusText) {
+        this.dom.apiStatusText.textContent = result.success ? 'Telemetry Synced' : 'API Offline';
+      }
+    }
   }
 
   render(state) {
