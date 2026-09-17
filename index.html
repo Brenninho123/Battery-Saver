@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Battery Saver Engine</title>
+  <title>Battery Saver Engine Core</title>
   <style>
     :root {
       --bg: #000000;
-      --card-bg: #0d0d0d;
-      --border: #1f1f1f;
-      --text: #e0e0e0;
-      --text-dim: #777777;
-      --accent: #00ff66;
-      --warning: #ffb700;
-      --danger: #ff3333;
+      --card-bg: #0a0a0a;
+      --border: #1c1c1e;
+      --text: #f2f2f7;
+      --text-dim: #6e6e73;
+      --accent: #30d158;
+      --warning: #ffd60a;
+      --danger: #ff453a;
+      --cyan: #64d2ff;
     }
 
     * {
@@ -26,17 +27,18 @@
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       min-height: 100vh;
       display: flex;
       justify-content: center;
       align-items: center;
       padding: 20px;
+      transition: background-color 0.3s ease;
     }
 
     .dashboard {
       width: 100%;
-      max-width: 440px;
+      max-width: 480px;
       display: flex;
       flex-direction: column;
       gap: 16px;
@@ -51,27 +53,29 @@
     }
 
     .header h1 {
-      font-size: 1.1rem;
-      letter-spacing: 1px;
+      font-size: 1rem;
+      letter-spacing: 1.5px;
       text-transform: uppercase;
       font-weight: 700;
+      color: var(--text-dim);
     }
 
     .badge {
-      font-size: 0.75rem;
-      padding: 4px 8px;
+      font-size: 0.7rem;
+      padding: 3px 8px;
       border-radius: 4px;
-      background: #151515;
-      color: var(--text-dim);
+      background: #121214;
+      color: var(--accent);
       border: 1px solid var(--border);
       text-transform: uppercase;
       letter-spacing: 0.5px;
+      font-weight: 600;
     }
 
     .card {
       background: var(--card-bg);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 14px;
       padding: 20px;
     }
 
@@ -85,25 +89,25 @@
     }
 
     .gauge-svg {
-      width: 180px;
-      height: 180px;
+      width: 200px;
+      height: 200px;
       transform: rotate(-90deg);
     }
 
     .gauge-bg {
       fill: none;
-      stroke: #1a1a1a;
-      stroke-width: 10;
+      stroke: #141414;
+      stroke-width: 8;
     }
 
     .gauge-fill {
       fill: none;
       stroke: var(--accent);
-      stroke-width: 10;
+      stroke-width: 8;
       stroke-linecap: round;
       stroke-dasharray: 440;
       stroke-dashoffset: 440;
-      transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease;
+      transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.5s ease;
     }
 
     .gauge-metrics {
@@ -114,59 +118,82 @@
     }
 
     .percentage {
-      font-size: 2.8rem;
+      font-size: 3.2rem;
       font-weight: 800;
-      letter-spacing: -1px;
+      letter-spacing: -1.5px;
       line-height: 1;
     }
 
     .state {
-      font-size: 0.75rem;
+      font-size: 0.7rem;
       color: var(--text-dim);
       margin-top: 6px;
       text-transform: uppercase;
-      letter-spacing: 1px;
+      letter-spacing: 1.2px;
+      font-weight: 600;
     }
 
     .metrics-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 12px;
+      gap: 10px;
     }
 
     .metric-item {
       background: #050505;
       border: 1px solid var(--border);
-      border-radius: 8px;
+      border-radius: 10px;
       padding: 12px;
     }
 
     .metric-label {
-      font-size: 0.7rem;
+      font-size: 0.65rem;
       color: var(--text-dim);
       text-transform: uppercase;
+      letter-spacing: 0.5px;
       margin-bottom: 4px;
     }
 
     .metric-value {
-      font-size: 0.95rem;
+      font-size: 0.9rem;
       font-weight: 600;
+      font-family: monospace;
+    }
+
+    .controls-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
     }
 
     .controls-title {
-      font-size: 0.8rem;
+      font-size: 0.75rem;
       text-transform: uppercase;
       color: var(--text-dim);
+      letter-spacing: 1px;
+      font-weight: 700;
+    }
+
+    .storage-status {
+      font-size: 0.65rem;
+      color: var(--accent);
+      text-transform: uppercase;
       letter-spacing: 0.5px;
-      margin-bottom: 12px;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .storage-status.visible {
+      opacity: 1;
     }
 
     .toggle-row {
       display: flex;
       justify-content: space-between;
       align-items: center;
-      padding: 10px 0;
-      border-bottom: 1px solid #141414;
+      padding: 12px 0;
+      border-bottom: 1px solid #121212;
     }
 
     .toggle-row:last-child {
@@ -176,6 +203,8 @@
     .toggle-label {
       display: flex;
       flex-direction: column;
+      gap: 2px;
+      padding-right: 12px;
     }
 
     .toggle-title {
@@ -186,6 +215,7 @@
     .toggle-desc {
       font-size: 0.7rem;
       color: var(--text-dim);
+      line-height: 1.2;
     }
 
     .switch {
@@ -193,6 +223,7 @@
       display: inline-block;
       width: 44px;
       height: 24px;
+      flex-shrink: 0;
     }
 
     .switch input {
@@ -208,8 +239,8 @@
       left: 0;
       right: 0;
       bottom: 0;
-      background-color: #222;
-      transition: 0.3s;
+      background-color: #1c1c1e;
+      transition: 0.25s ease;
       border-radius: 24px;
       border: 1px solid var(--border);
     }
@@ -222,7 +253,7 @@
       left: 3px;
       bottom: 3px;
       background-color: var(--text-dim);
-      transition: 0.3s;
+      transition: 0.25s ease;
       border-radius: 50%;
     }
 
@@ -232,7 +263,27 @@
 
     input:checked + .slider:before {
       transform: translateX(20px);
-      background-color: #000;
+      background-color: #000000;
+    }
+
+    .btn-reset {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text-dim);
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      cursor: pointer;
+      width: 100%;
+      font-weight: 600;
+      transition: all 0.2s ease;
+    }
+
+    .btn-reset:active {
+      background: #151515;
+      color: var(--text);
     }
   </style>
 </head>
@@ -240,8 +291,8 @@
 
   <div class="dashboard">
     <div class="header">
-      <h1>Battery Saver</h1>
-      <div class="badge" id="engine-status">Active</div>
+      <h1>Battery Engine v2.0</h1>
+      <div class="badge" id="engine-status">ONLINE</div>
     </div>
 
     <div class="card">
@@ -252,7 +303,7 @@
         </svg>
         <div class="gauge-metrics">
           <span class="percentage" id="level-display">--%</span>
-          <span class="state" id="status-display">INITIALIZING</span>
+          <span class="state" id="status-display">READING</span>
         </div>
       </div>
     </div>
@@ -271,18 +322,21 @@
         <div class="metric-value" id="profile-status">Standard</div>
       </div>
       <div class="metric-item">
-        <div class="metric-label">Thread Governor</div>
-        <div class="metric-value" id="governor-status">Normal</div>
+        <div class="metric-label">Frame Limiter</div>
+        <div class="metric-value" id="fps-status">60 FPS</div>
       </div>
     </div>
 
     <div class="card">
-      <div class="controls-title">Optimization Triggers</div>
+      <div class="controls-header">
+        <span class="controls-title">Optimization Governors</span>
+        <span class="storage-status" id="storage-status">Saved</span>
+      </div>
       
       <div class="toggle-row">
         <div class="toggle-label">
           <span class="toggle-title">Aggressive Power Saver</span>
-          <span class="toggle-desc">Throttle execution rate & DOM updates</span>
+          <span class="toggle-desc">Throttle execution rate & event loops</span>
         </div>
         <label class="switch">
           <input type="checkbox" id="toggle-saver">
@@ -292,36 +346,90 @@
 
       <div class="toggle-row">
         <div class="toggle-label">
-          <span class="toggle-title">AMOLED Blackout Mode</span>
-          <span class="toggle-desc">Force true black canvas render</span>
+          <span class="toggle-title">Pure OLED Blackout Mode</span>
+          <span class="toggle-desc">Zero-pixel emission black background</span>
         </div>
         <label class="switch">
-          <input type="checkbox" id="toggle-amoled" checked>
+          <input type="checkbox" id="toggle-amoled">
           <span class="slider"></span>
         </label>
       </div>
 
       <div class="toggle-row">
         <div class="toggle-label">
-          <span class="toggle-title">Hardware Concurrency Limit</span>
-          <span class="toggle-desc">Suppress background async tasks</span>
+          <span class="toggle-title">Display Refresh Rate Governor</span>
+          <span class="toggle-desc">Cap render target rate to 30 FPS</span>
         </div>
         <label class="switch">
-          <input type="checkbox" id="toggle-threads">
+          <input type="checkbox" id="toggle-fps">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div class="toggle-row">
+        <div class="toggle-label">
+          <span class="toggle-title">Auto Low Power Threshold</span>
+          <span class="toggle-desc">Auto-enable saver mode at <= 20%</span>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="toggle-autosaver">
           <span class="slider"></span>
         </label>
       </div>
     </div>
+
+    <button class="btn-reset" id="btn-reset">Reset Configuration Storage</button>
   </div>
 
   <script>
-    class PowerOptimizerEngine {
+    class StorageManager {
+      constructor(key = 'battery_engine_config') {
+        this.STORAGE_KEY = key;
+        this.defaults = {
+          saverMode: false,
+          amoledMode: true,
+          fpsCap: false,
+          autoSaver: true
+        };
+      }
+
+      load() {
+        try {
+          const raw = localStorage.getItem(this.STORAGE_KEY);
+          return raw ? { ...this.defaults, ...JSON.parse(raw) } : { ...this.defaults };
+        } catch (e) {
+          return { ...this.defaults };
+        }
+      }
+
+      save(config) {
+        try {
+          localStorage.setItem(this.STORAGE_KEY, JSON.stringify(config));
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+
+      clear() {
+        try {
+          localStorage.removeItem(this.STORAGE_KEY);
+          return true;
+        } catch (e) {
+          return false;
+        }
+      }
+    }
+
+    class BatteryEngineCore {
       constructor() {
+        this.storage = new StorageManager();
+        this.config = this.storage.load();
         this.battery = null;
-        this.saverMode = false;
-        this.concurrencyLimited = false;
-        this.workerInterval = null;
         this.circumference = 2 * Math.PI * 70;
+        this.animationFrameId = null;
+        this.lastFrameTime = 0;
+        this.targetFPS = 60;
 
         this.dom = {
           gaugeFill: document.getElementById('gauge-fill'),
@@ -330,18 +438,24 @@
           dischargingTime: document.getElementById('discharging-time'),
           chargingTime: document.getElementById('charging-time'),
           profileStatus: document.getElementById('profile-status'),
-          governorStatus: document.getElementById('governor-status'),
+          fpsStatus: document.getElementById('fps-status'),
           engineStatus: document.getElementById('engine-status'),
+          storageStatus: document.getElementById('storage-status'),
           toggleSaver: document.getElementById('toggle-saver'),
           toggleAmoled: document.getElementById('toggle-amoled'),
-          toggleThreads: document.getElementById('toggle-threads')
+          toggleFps: document.getElementById('toggle-fps'),
+          toggleAutosaver: document.getElementById('toggle-autosaver'),
+          btnReset: document.getElementById('btn-reset')
         };
 
         this.init();
       }
 
       async init() {
+        this.applyStoredStateUI();
         this.bindEvents();
+        this.startEngineLoop();
+
         if ('getBattery' in navigator) {
           try {
             this.battery = await navigator.getBattery();
@@ -352,6 +466,27 @@
           }
         } else {
           this.fallbackState();
+        }
+      }
+
+      applyStoredStateUI() {
+        this.dom.toggleSaver.checked = this.config.saverMode;
+        this.dom.toggleAmoled.checked = this.config.amoledMode;
+        this.dom.toggleFps.checked = this.config.fpsCap;
+        this.dom.toggleAutosaver.checked = this.config.autoSaver;
+
+        this.applySaverMode(this.config.saverMode, false);
+        this.applyAmoledTheme(this.config.amoledMode, false);
+        this.applyFPSCap(this.config.fpsCap, false);
+      }
+
+      persistConfig() {
+        const success = this.storage.save(this.config);
+        if (success) {
+          this.dom.storageStatus.classList.add('visible');
+          setTimeout(() => {
+            this.dom.storageStatus.classList.remove('visible');
+          }, 1200);
         }
       }
 
@@ -398,9 +533,10 @@
           this.dom.chargingTime.textContent = 'N/A';
         }
 
-        if (percentage <= 15 && !this.battery.charging && !this.saverMode) {
+        if (percentage <= 20 && !this.battery.charging && this.config.autoSaver && !this.config.saverMode) {
           this.dom.toggleSaver.checked = true;
-          this.setSaverMode(true);
+          this.config.saverMode = true;
+          this.applySaverMode(true, true);
         }
       }
 
@@ -411,46 +547,70 @@
         this.dom.engineStatus.style.color = 'var(--danger)';
       }
 
-      setSaverMode(enable) {
-        this.saverMode = enable;
+      applySaverMode(enable, save = true) {
+        this.config.saverMode = enable;
         this.dom.profileStatus.textContent = enable ? 'ECO (Throttled)' : 'Standard';
         this.dom.profileStatus.style.color = enable ? 'var(--accent)' : 'var(--text)';
-        
-        if (enable) {
-          document.body.classList.add('eco-render');
-        } else {
-          document.body.classList.remove('eco-render');
-        }
+        if (save) this.persistConfig();
       }
 
-      setThreadGovernor(enable) {
-        this.concurrencyLimited = enable;
-        this.dom.governorStatus.textContent = enable ? 'Restricted (1 Thread)' : 'Normal';
-        this.dom.governorStatus.style.color = enable ? 'var(--warning)' : 'var(--text)';
+      applyAmoledTheme(enable, save = true) {
+        this.config.amoledMode = enable;
+        document.documentElement.style.setProperty('--bg', enable ? '#000000' : '#0d0e12');
+        document.documentElement.style.setProperty('--card-bg', enable ? '#0a0a0a' : '#14151b');
+        if (save) this.persistConfig();
       }
 
-      setAmoledTheme(enable) {
-        document.documentElement.style.setProperty('--bg', enable ? '#000000' : '#0a0a0c');
-        document.documentElement.style.setProperty('--card-bg', enable ? '#0d0d0d' : '#141418');
+      applyFPSCap(enable, save = true) {
+        this.config.fpsCap = enable;
+        this.targetFPS = enable ? 30 : 60;
+        this.dom.fpsStatus.textContent = enable ? '30 FPS (Cap)' : '60 FPS';
+        this.dom.fpsStatus.style.color = enable ? 'var(--cyan)' : 'var(--text)';
+        if (save) this.persistConfig();
+      }
+
+      startEngineLoop() {
+        const loop = (timestamp) => {
+          const delta = timestamp - this.lastFrameTime;
+          const interval = 1000 / this.targetFPS;
+
+          if (delta >= interval) {
+            this.lastFrameTime = timestamp - (delta % interval);
+          }
+
+          this.animationFrameId = requestAnimationFrame(loop);
+        };
+        this.animationFrameId = requestAnimationFrame(loop);
       }
 
       bindEvents() {
         this.dom.toggleSaver.addEventListener('change', (e) => {
-          this.setSaverMode(e.target.checked);
+          this.applySaverMode(e.target.checked);
         });
 
         this.dom.toggleAmoled.addEventListener('change', (e) => {
-          this.setAmoledTheme(e.target.checked);
+          this.applyAmoledTheme(e.target.checked);
         });
 
-        this.dom.toggleThreads.addEventListener('change', (e) => {
-          this.setThreadGovernor(e.target.checked);
+        this.dom.toggleFps.addEventListener('change', (e) => {
+          this.applyFPSCap(e.target.checked);
+        });
+
+        this.dom.toggleAutosaver.addEventListener('change', (e) => {
+          this.config.autoSaver = e.target.checked;
+          this.persistConfig();
+        });
+
+        this.dom.btnReset.addEventListener('click', () => {
+          this.storage.clear();
+          this.config = this.storage.load();
+          this.applyStoredStateUI();
         });
       }
     }
 
     document.addEventListener('DOMContentLoaded', () => {
-      window.Engine = new PowerOptimizerEngine();
+      window.Engine = new BatteryEngineCore();
     });
   </script>
 </body>
