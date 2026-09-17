@@ -10,13 +10,14 @@ export class BatterySaverApp {
     this.engine = new PowerEngine();
     this.api = new BatteryApi(this.config.apiEndpoint);
     this.gametime = new GametimeOverlay({ visible: this.config.gametimeOverlay });
-    
+
     this.circumference = 2 * Math.PI * 70;
     this.lastSyncTime = 0;
     this.syncIntervalMs = this.config.syncInterval || 60000;
     this.sessionStartTime = Date.now();
     this.wakeLock = null;
     this.isPaused = false;
+    this.eventListeners = new Map();
 
     this.dom = {
       gaugeFill: document.getElementById('gauge-fill'),
@@ -40,6 +41,7 @@ export class BatterySaverApp {
       toggleAutosaver: document.getElementById('toggle-autosaver'),
       toggleGametime: document.getElementById('toggle-gametime'),
       btnReset: document.getElementById('btn-reset'),
+      btnReplayIntro: document.getElementById('btn-replay-intro'),
       apiStatusText: document.getElementById('api-status-text')
     };
 
@@ -49,7 +51,7 @@ export class BatterySaverApp {
   async init() {
     await this.engine.init();
     this.gametime.init();
-    
+
     if (this.config.samples && Array.isArray(this.config.samples)) {
       this.engine.drainSamples = this.config.samples;
     }
@@ -64,6 +66,7 @@ export class BatterySaverApp {
     this.initVisibilityGovernor();
     this.initNetworkMonitor();
     this.initHardwareMetrics();
+    this.initThermalGovernor();
 
     this.engine.subscribe((state) => {
       if (this.isPaused) return;
@@ -183,6 +186,27 @@ export class BatterySaverApp {
     }
   }
 
+  initThermalGovernor() {
+    if ('computePressure' in window) {
+      try {
+        const observer = new PressureObserver((entries) => {
+          const latest = entries[entries.length - 1];
+          if (latest.state === 'critical' || latest.state === 'serious') {
+            if (!this.config.saverMode) {
+              this.config.saverMode = true;
+              this.engine.setEcoMode(true);
+              this.engine.setFrameRateCap(true);
+              if (this.dom.toggleSaver) this.dom.toggleSaver.checked = true;
+              if (this.dom.toggleFps) this.dom.toggleFps.checked = true;
+              this.saveState();
+            }
+          }
+        });
+        observer.observe('cpu');
+      } catch (e) {}
+    }
+  }
+
   triggerHapticFeedback(pattern = [40]) {
     if ('vibrate' in navigator && !this.config.saverMode) {
       navigator.vibrate(pattern);
@@ -191,17 +215,17 @@ export class BatterySaverApp {
 
   async handleCloudSync(state) {
     if (!this.config.cloudSync || !this.config.apiEndpoint) return;
-    
+
     const now = Date.now();
     if (now - this.lastSyncTime >= this.syncIntervalMs) {
       this.lastSyncTime = now;
       if (this.dom.apiStatusText) this.dom.apiStatusText.textContent = 'Syncing Telemetry...';
-      
+
       const payload = {
         ...state,
         sessionDurationMs: now - this.sessionStartTime
       };
-      
+
       const result = await this.api.syncTelemetry(payload);
       if (this.dom.apiStatusText) {
         this.dom.apiStatusText.textContent = result.success ? 'Telemetry Synced' : 'API Offline';
@@ -226,7 +250,7 @@ export class BatterySaverApp {
     if (this.dom.gaugeFill) {
       this.dom.gaugeFill.style.strokeDasharray = `${this.circumference}`;
       this.dom.gaugeFill.style.strokeDashoffset = offset;
-      
+
       if (level <= 20) {
         this.dom.gaugeFill.style.stroke = 'var(--danger)';
       } else if (level <= 45) {
@@ -359,7 +383,23 @@ export class BatterySaverApp {
     }
   }
 
+  on(eventName, listener) {
+    if (!this.eventListeners.has(eventName)) {
+      this.eventListeners.set(eventName, new Set());
+    }
+    this.eventListeners.get(eventName).add(listener);
+  }
+
+  off(eventName, listener) {
+    if (this.eventListeners.has(eventName)) {
+      this.eventListeners.get(eventName).delete(listener);
+    }
+  }
+
   dispatchEvent(name, detail = {}) {
+    if (this.eventListeners.has(name)) {
+      this.eventListeners.get(name).forEach((fn) => fn(detail));
+    }
     window.dispatchEvent(new CustomEvent(`batterysaver:${name}`, { detail }));
   }
 }
