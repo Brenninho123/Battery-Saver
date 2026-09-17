@@ -7,7 +7,9 @@ export class ConfigStorage {
       fpsCap: false,
       taskLimit: true,
       autoSaver: true,
-      samples: []
+      samples: [],
+      apiEndpoint: '',
+      cloudSync: false
     };
   }
 
