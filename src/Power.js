@@ -9,7 +9,11 @@ export class PowerEngine {
     this.lastFrameTime = performance.now();
     this.listeners = new Set();
     this.drainSamples = [];
-    this.maxSamples = 50;
+    this.maxSamples = 100;
+    this.thermalState = 'nominal';
+    this.networkState = 'online';
+    this.deviceMemoryGB = navigator.deviceMemory || 4;
+    this.hardwareConcurrency = navigator.hardwareConcurrency || 4;
   }
 
   static getPlatformInfo() {
@@ -21,20 +25,23 @@ export class PowerEngine {
       isIOS,
       isAndroid,
       isMobile: isIOS || isAndroid,
-      platformName: isIOS ? 'iOS WebKit Engine' : isAndroid ? 'Android BatteryManager' : 'Desktop Engine',
-      hardwareConcurrency: navigator.hardwareConcurrency || 2,
-      deviceMemory: navigator.deviceMemory || 'Unknown'
+      platformName: isIOS ? 'iOS WebKit Core' : isAndroid ? 'Android BatteryManager' : 'Desktop Engine',
+      hardwareConcurrency: navigator.hardwareConcurrency || 4,
+      deviceMemory: navigator.deviceMemory || 'Unknown',
+      connectionType: navigator.connection ? navigator.connection.effectiveType : 'Unknown'
     };
   }
 
   async init() {
+    this._setupNetworkObserver();
+    this._setupThermalObserver();
+
     if ('getBattery' in navigator) {
       try {
         this.battery = await navigator.getBattery();
         this._bindBatteryEvents();
         this.recordTelemetrySample();
-      } catch (e) {
-      }
+      } catch (e) {}
     }
     this._startGovernorLoop();
   }
@@ -49,6 +56,37 @@ export class PowerEngine {
         this.notifyState();
       });
     });
+  }
+
+  _setupNetworkObserver() {
+    if ('connection' in navigator) {
+      const conn = navigator.connection;
+      this.networkState = conn.effectiveType || 'online';
+      conn.addEventListener('change', () => {
+        this.networkState = conn.effectiveType || 'online';
+        if (conn.saveData && !this.isEcoMode) {
+          this.setEcoMode(true);
+        }
+        this.notifyState();
+      });
+    }
+  }
+
+  _setupThermalObserver() {
+    if ('computePressure' in window) {
+      try {
+        const observer = new PressureObserver((entries) => {
+          const latest = entries[entries.length - 1];
+          this.thermalState = latest.state;
+          if (latest.state === 'critical' || latest.state === 'serious') {
+            this.setFrameRateCap(true);
+            this.setEcoMode(true);
+          }
+          this.notifyState();
+        });
+        observer.observe('cpu');
+      } catch (e) {}
+    }
   }
 
   getTelemetry() {
@@ -78,7 +116,8 @@ export class PowerEngine {
     const sample = {
       timestamp: Date.now(),
       level: telemetry.level,
-      charging: telemetry.charging
+      charging: telemetry.charging,
+      thermalState: this.thermalState
     };
 
     this.drainSamples.push(sample);
@@ -90,10 +129,11 @@ export class PowerEngine {
   analyzeWearProfile() {
     if (this.drainSamples.length < 3) {
       return {
-        healthScore: 'Gathering Data',
+        healthScore: 'Gathering Telemetry',
         status: 'optimal',
         drainRatePerMin: 0,
-        unstableSpikes: 0
+        unstableSpikes: 0,
+        estimatedCapacityLossPct: 0
       };
     }
 
@@ -136,7 +176,8 @@ export class PowerEngine {
       healthScore,
       status,
       drainRatePerMin: avgDrainRate,
-      unstableSpikes
+      unstableSpikes,
+      estimatedCapacityLossPct: Number((unstableSpikes * 1.5 + avgDrainRate * 2).toFixed(1))
     };
   }
 
@@ -189,7 +230,9 @@ export class PowerEngine {
       isEcoMode: this.isEcoMode,
       targetFPS: this.targetFPS,
       isFPSThrottled: this.isFPSThrottled,
-      isThreadThrottled: this.isThreadThrottled
+      isThreadThrottled: this.isThreadThrottled,
+      thermalState: this.thermalState,
+      networkState: this.networkState
     };
     this.listeners.forEach(fn => fn(state));
   }
