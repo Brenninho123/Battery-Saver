@@ -1,5 +1,5 @@
-const CACHE_NAME = 'battery-saver-v3.0';
-const DYNAMIC_CACHE_NAME = 'battery-saver-dynamic-v3.0';
+const CACHE_NAME = 'battery-saver-v4.0';
+const DYNAMIC_CACHE_NAME = 'battery-saver-dynamic-v4.0';
 
 const STATIC_ASSETS = [
   './',
@@ -9,7 +9,9 @@ const STATIC_ASSETS = [
   './src/Power.js',
   './src/Storage.js',
   './src/BatteryApi.js',
-  './src/Gametime.js'
+  './src/Gametime.js',
+  './src/Charger.js',
+  './src/Offline.js'
 ];
 
 self.addEventListener('install', (event) => {
