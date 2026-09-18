@@ -3,6 +3,7 @@ import { ConfigStorage } from './Storage.js';
 import { BatteryApi } from './BatteryApi.js';
 import { GametimeOverlay } from './Gametime.js';
 import { BatteryChargerEngine } from './Charger.js';
+import { OfflineManager } from './Offline.js';
 
 export class BatterySaverApp {
   constructor() {
@@ -12,6 +13,7 @@ export class BatterySaverApp {
     this.api = new BatteryApi(this.config.apiEndpoint);
     this.gametime = new GametimeOverlay({ visible: this.config.gametimeOverlay });
     this.charger = new BatteryChargerEngine();
+    this.offline = new OfflineManager();
 
     this.circumference = 2 * Math.PI * 70;
     this.lastSyncTime = 0;
@@ -70,11 +72,15 @@ export class BatterySaverApp {
     this.initHardwareMetrics();
     this.initThermalGovernor();
 
+    this.offline.subscribe((netState) => {
+      this.updateNetworkUI(netState);
+    });
+
     this.engine.subscribe((state) => {
       if (this.isPaused) return;
       const chargeProfile = this.charger.evaluateChargeState(state.telemetry);
-      const combinedState = { ...state, chargeProfile };
-      
+      const combinedState = { ...state, chargeProfile, isOnline: this.offline.isOnline };
+
       this.render(combinedState);
       this.gametime.update(state.telemetry);
       this.handleCloudSync(combinedState);
@@ -212,6 +218,18 @@ export class BatterySaverApp {
     }
   }
 
+  updateNetworkUI(netState) {
+    if (this.dom.apiStatusText) {
+      if (!netState.isOnline) {
+        this.dom.apiStatusText.textContent = 'Offline Engine (Local Cache Active)';
+        this.dom.apiStatusText.style.color = 'var(--warning)';
+      } else {
+        this.dom.apiStatusText.textContent = 'Cloud Sync Standby';
+        this.dom.apiStatusText.style.color = 'var(--text-dim)';
+      }
+    }
+  }
+
   triggerHapticFeedback(pattern = [40]) {
     if ('vibrate' in navigator && !this.config.saverMode) {
       navigator.vibrate(pattern);
@@ -219,7 +237,7 @@ export class BatterySaverApp {
   }
 
   async handleCloudSync(state) {
-    if (!this.config.cloudSync || !this.config.apiEndpoint) return;
+    if (!this.config.cloudSync || !this.config.apiEndpoint || !this.offline.isOnline) return;
 
     const now = Date.now();
     if (now - this.lastSyncTime >= this.syncIntervalMs) {
@@ -297,6 +315,9 @@ export class BatterySaverApp {
 
     if (this.dom.diagnosticLogs) {
       let logs = [];
+      if (!this.offline.isOnline) {
+        logs.push({ text: 'Engine running offline. Local IndexedDB storage active.', color: 'var(--warning)' });
+      }
       if (chargeProfile && chargeProfile.isCharging) {
         logs.push({ text: `Power Mode: ${chargeProfile.chargeType}`, color: 'var(--ios-blue)' });
         if (chargeProfile.overheatWarning) {
