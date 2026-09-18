@@ -2,6 +2,7 @@ import { PowerEngine } from './Power.js';
 import { ConfigStorage } from './Storage.js';
 import { BatteryApi } from './BatteryApi.js';
 import { GametimeOverlay } from './Gametime.js';
+import { BatteryChargerEngine } from './Charger.js';
 
 export class BatterySaverApp {
   constructor() {
@@ -10,6 +11,7 @@ export class BatterySaverApp {
     this.engine = new PowerEngine();
     this.api = new BatteryApi(this.config.apiEndpoint);
     this.gametime = new GametimeOverlay({ visible: this.config.gametimeOverlay });
+    this.charger = new BatteryChargerEngine();
 
     this.circumference = 2 * Math.PI * 70;
     this.lastSyncTime = 0;
@@ -70,10 +72,13 @@ export class BatterySaverApp {
 
     this.engine.subscribe((state) => {
       if (this.isPaused) return;
-      this.render(state);
+      const chargeProfile = this.charger.evaluateChargeState(state.telemetry);
+      const combinedState = { ...state, chargeProfile };
+      
+      this.render(combinedState);
       this.gametime.update(state.telemetry);
-      this.handleCloudSync(state);
-      this.dispatchEvent('telemetry', state);
+      this.handleCloudSync(combinedState);
+      this.dispatchEvent('telemetry', combinedState);
     });
 
     this.engine.notifyState();
@@ -234,7 +239,7 @@ export class BatterySaverApp {
   }
 
   render(state) {
-    const { telemetry, wearAnalysis } = state;
+    const { telemetry, wearAnalysis, chargeProfile } = state;
 
     if (!telemetry || !telemetry.supported) {
       if (this.dom.statusDisplay) this.dom.statusDisplay.textContent = 'OS STANDBY';
@@ -264,7 +269,7 @@ export class BatterySaverApp {
 
     if (this.dom.statusDisplay) {
       if (telemetry.charging) {
-        this.dom.statusDisplay.textContent = 'CHARGING';
+        this.dom.statusDisplay.textContent = chargeProfile?.chargeType || 'CHARGING';
         if (this.dom.remainingTime) this.dom.remainingTime.textContent = this.formatTime(telemetry.chargingTime);
       } else {
         this.dom.statusDisplay.textContent = 'DISCHARGING';
@@ -292,10 +297,16 @@ export class BatterySaverApp {
 
     if (this.dom.diagnosticLogs) {
       let logs = [];
+      if (chargeProfile && chargeProfile.isCharging) {
+        logs.push({ text: `Power Mode: ${chargeProfile.chargeType}`, color: 'var(--ios-blue)' });
+        if (chargeProfile.overheatWarning) {
+          logs.push({ text: 'High thermal stress detected due to fast charging above 80%.', color: 'var(--danger)' });
+        }
+      }
       if (wearAnalysis.unstableSpikes > 0) {
         logs.push({ text: `Detected ${wearAnalysis.unstableSpikes} capacity drop anomaly. Wear risk detected.`, color: 'var(--danger)' });
       }
-      if (wearAnalysis.drainRatePerMin > 1.2) {
+      if (wearAnalysis.drainRatePerMin > 1.2 && !telemetry.charging) {
         logs.push({ text: 'High discharge velocity logged during passive cycle.', color: 'var(--warning)' });
       }
       if (logs.length === 0) {
